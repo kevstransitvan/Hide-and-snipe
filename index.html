@@ -116,8 +116,40 @@ function createPeer(){
  peer.on('error',e=>{say('Connection error: '+e.type+'. Try creating a new room.');$('create').disabled=false;$('create').textContent='CREATE PRIVATE ROOM';});
 }
 function joinPeer(){
- roomCode=$('code').value.trim().toUpperCase();if(roomCode.length<4){toast('Enter the room code');return}
- peer=new Peer();peer.on('open',()=>{conn=peer.connect('hs-'+roomCode.toLowerCase(),{reliable:true});setupConn(false)});peer.on('error',e=>{say('Could not connect: '+e.type+'. Check the code and try again.');});
+  roomCode = $('code').value.trim().toUpperCase();
+  if(roomCode.length < 4){
+    toast('Enter the room code');
+    return;
+  }
+
+  say('Connecting to room ' + roomCode + '...');
+
+  peer = new Peer();
+
+  peer.on('open', () => {
+    say('Connecting to host...');
+
+    conn = peer.connect('hs-' + roomCode.toLowerCase(), {
+      reliable: true
+    });
+
+    conn.on('open', () => {
+      say('Connected to host!');
+      setupConn(false);
+    });
+
+    conn.on('error', e => {
+      say('Connection error: ' + e.type);
+    });
+
+    conn.on('close', () => {
+      say('Connection closed. Try again.');
+    });
+  });
+
+  peer.on('error', e => {
+    say('Peer error: ' + e.type + '. ' + e.message);
+  });
 }
 function setupConn(isHost){
  host=isHost;
