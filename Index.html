@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Hide & Snipe — prototype</title>
+<style>
+:root{color-scheme:dark;--panel:#101923dd;--line:#ffffff35;--accent:#9fe870}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101820;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none;color:#fff}
+#game{position:fixed;inset:0}canvas{display:block;width:100%;height:100%;touch-action:none}
+#top{position:fixed;z-index:4;top:env(safe-area-inset-top,8px);left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px;pointer-events:none}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 11px;font-size:12px;backdrop-filter:blur(8px);white-space:nowrap}
+#hudscore{font-weight:800;font-size:14px}#timer{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums}
+#status{position:fixed;z-index:5;top:58px;left:50%;transform:translateX(-50%);background:#101923dd;border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-size:12px;text-align:center;max-width:90vw}
+#controls{position:fixed;inset:0;z-index:3;pointer-events:none}
+#stick{position:absolute;left:18px;bottom:20px;width:118px;height:118px;border:2px solid #ffffff70;background:#0b101866;border-radius:50%;pointer-events:auto;touch-action:none}
+#nub{position:absolute;width:48px;height:48px;left:33px;top:33px;border-radius:50%;background:#ffffffb8;border:2px solid white;box-shadow:0 2px 12px #0008}
+.action{pointer-events:auto;touch-action:manipulation;border:1px solid #ffffff66;background:#17232ddf;color:white;border-radius:50%;width:65px;height:65px;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;text-align:center;box-shadow:0 3px 12px #0006}
+#crouch{position:absolute;right:94px;bottom:20px}#sprint{position:absolute;right:18px;bottom:20px}#cover{position:absolute;right:18px;bottom:96px;width:58px;height:58px}
+#fire{position:absolute;right:22px;bottom:20px;width:86px;height:86px;background:#a82727e8;border:2px solid #ffb2a9;font-size:14px}
+#aimhint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;opacity:.85}
+#aimhint:before,#aimhint:after{content:"";position:absolute;background:#d7ffb6;box-shadow:0 0 3px #000}
+#aimhint:before{width:2px;height:32px;left:15px}#aimhint:after{height:2px;width:32px;top:15px}
+#lobby{position:fixed;z-index:10;inset:0;background:linear-gradient(135deg,#101820f5,#1e3029f5);display:flex;align-items:center;justify-content:center;padding:18px}
+#panel{width:min(520px,100%);max-height:95%;overflow:auto;background:#101923;border:1px solid #ffffff2a;border-radius:20px;padding:22px;box-shadow:0 20px 80px #0009}
+h1{font-size:27px;margin:0 0 4px}p{color:#c8d4db;line-height:1.4;font-size:14px}
+input{width:100%;padding:13px;border-radius:10px;border:1px solid #ffffff38;background:#081018;color:white;font-size:17px;letter-spacing:2px;text-transform:uppercase}
+button{font:inherit;cursor:pointer} .big{width:100%;border:0;border-radius:11px;padding:13px;font-weight:850;background:var(--accent);color:#142010;margin-top:9px}.secondary{background:#263642;color:white;border:1px solid #ffffff35}
+#roomline{font-size:24px;font-weight:900;letter-spacing:5px;color:var(--accent);margin:10px 0}
+.small{font-size:12px;color:#9fb0ba}.hidden{display:none!important}
+#toast{position:fixed;z-index:8;bottom:120px;left:50%;transform:translateX(-50%);background:#111c;border:1px solid #ffffff35;border-radius:12px;padding:10px 14px;max-width:90vw;text-align:center;display:none}
+#healthwrap{position:fixed;z-index:4;left:12px;top:62px;width:150px;background:#07100dcc;border-radius:8px;padding:6px}
+#healthbar{height:8px;background:#e34c4c;width:100%;border-radius:5px;transition:width .15s}#healthlabel{font-size:10px;margin-bottom:4px}
+@media (orientation:portrait){#rotate{display:flex!important}}
+#rotate{display:none;position:fixed;z-index:20;inset:0;background:#0c131aee;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:20px;font-weight:800}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="top"><div class="pill" id="rolepill">HIDE & SNIPE</div><div class="pill" id="hudscore">KILLS 0 · SURVIVALS 0</div><div class="pill" id="timer">03:00</div></div>
+<div id="status">Create a room or join your partner</div>
+<div id="healthwrap"><div id="healthlabel">HIDER HEALTH <b id="hptext">100%</b></div><div id="healthbar"></div></div>
+<div id="controls" class="hidden">
+ <div id="stick"><div id="nub"></div></div>
+ <button class="action" id="crouch">CROUCH</button><button class="action" id="sprint">SPRINT</button><button class="action" id="cover">TAKE<br>COVER</button>
+ <button class="action hidden" id="fire">FIRE</button><div id="aimhint"></div>
+</div>
+<div id="toast"></div>
+<div id="rotate">↻<br><br>Please rotate your phone to landscape</div>
+<div id="lobby"><div id="panel">
+ <h1>🎯 Hide &amp; Snipe</h1><p>A two-phone 3D hide-and-seek sniper game. This is an early playable prototype; online connection uses PeerJS's public signalling service.</p>
+ <button id="create" class="big">CREATE PRIVATE ROOM</button>
+ <div id="hostbox" class="hidden"><p>Share this room code with your wife. She chooses “Join room” on her phone.</p><div id="roomline"></div><p id="waitmsg">Waiting for the second player…</p><button id="start" class="big hidden">START 3-MINUTE ROUND</button></div>
+ <hr style="border-color:#ffffff20;margin:18px 0">
+ <label class="small" for="code">JOIN A ROOM</label><input id="code" maxlength="6" placeholder="6-LETTER CODE" autocomplete="off">
+ <button id="join" class="big secondary">JOIN ROOM</button>
+ <p class="small">Best-effort internet prototype: both phones need internet. Some networks may block peer-to-peer connections. No account is needed.</p>
+ <p class="small">Controls: hider uses the joystick, crouch, sprint and cover. Shooter swipes to aim, pinches to zoom, then taps Fire.</p>
+</div></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
+import Peer from 'https://esm.sh/peerjs@1.5.4';
+
+const $=id=>document.getElementById(id);
+let renderer,scene,camera,clock,peer,conn,host=false,connected=false,started=false,role='hider';
+let roomCode='',worldObjects=[],coverObjects=[],hider,gun,health=100,kills=0,survivals=0,remaining=180,roundStart=0,lastSend=0;
+let yaw=0,pitch=0,zoom=1,crouching=false,sprinting=false,inCover=false,stickVec={x:0,y:0},lastTouch=null,pinchDist=0,remote={x:0,y:0,z:0,yaw:0,crouching:false,health:100},shotFlash=0;
+const materialStrength={wood:0.35,metal:0.7,concrete:1};
+function say(s){$('status').textContent=s}
+function toast(s){$('toast').textContent=s;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',1800)}
+function setTimer(){let n=Math.max(0,Math.ceil(remaining));$('timer').textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
+function updateHud(){ $('hudscore').textContent=`KILLS ${kills} · SURVIVALS ${survivals}`;$('hptext').textContent=Math.max(0,Math.round(health))+'%';$('healthbar').style.width=Math.max(0,health)+'%';$('rolepill').textContent=role==='hider'?'HIDER · THIRD PERSON':'SNIPER · FIRST PERSON';$('fire').classList.toggle('hidden',role!=='shooter');$('stick').style.opacity=role==='hider'?'1':'.25';$('crouch').style.opacity=role==='hider'?'1':'.25';$('sprint').style.opacity=role==='hider'?'1':'.25';$('cover').style.opacity=role==='hider'?'1':'.25'}
+function init3D(){
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x9bb4b4);scene.fog=new THREE.Fog(0x9bb4b4,30,95);
+ camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,180);
+ renderer=new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('game').appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0xddeeff,0x52614d,2));
+ let sun=new THREE.DirectionalLight(0xfff0d6,2.5);sun.position.set(-12,25,10);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x657b60,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+ const grid=new THREE.GridHelper(80,40,0x354d3a,0x53694e);grid.position.y=.015;scene.add(grid);
+ const mat=(c,r=.85)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
+ function box(x,y,z,sx,sy,sz,color,type='concrete'){let m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;m.userData={coverType:type,strength:materialStrength[type]||1};scene.add(m);coverObjects.push(m);worldObjects.push(m);return m}
+ // Perimeter and cover: different materials/strengths.
+ box(0,1,-22,44,2,1,0x68716d,'concrete');box(0,1,22,44,2,1,0x68716d,'concrete');box(-22,1,0,1,2,44,0x68716d,'concrete');box(22,1,0,1,2,44,0x68716d,'concrete');
+ for(let i=0;i<8;i++){let x=-15+(i%4)*10,z=-13+Math.floor(i/4)*26;box(x,.8,z,3.5,1.6,2.5, i%3===0?0x8b5b35:i%3===1?0x59676d:0x777c79,i%3===0?'wood':i%3===1?'metal':'concrete')}
+ // Crates and barrels
+ for(let i=0;i<6;i++){let x=-14+(i%3)*14,z=-6+Math.floor(i/3)*12;box(x,.65,z,1.6,1.3,1.6,0x94643b,'wood')}
+ for(let i=0;i<4;i++){let x=-9+i*6,z=(i%2?4:-4);let m=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,1.3,16),mat(0x65777d));m.position.set(x,.65,z);m.castShadow=true;m.userData={coverType:'metal',strength:.7};scene.add(m);coverObjects.push(m);worldObjects.push(m)}
+ // Low concrete dividers
+ box(-5,.55,0,7,1.1,.55,0x7e8580,'concrete');box(7,.55,9,7,1.1,.55,0x7e8580,'concrete');
+ // Simple stylized hider character; sphere head + torso + limbs.
+ hider=new THREE.Group();const skin=mat(0xd7ad88),shirt=mat(0x315b49),pants=mat(0x303944),dark=mat(0x1d242b);
+ let torso=new THREE.Mesh(new THREE.CapsuleGeometry(.36,.65,4,8),shirt);torso.position.y=1.15;torso.castShadow=true;hider.add(torso);
+ let head=new THREE.Mesh(new THREE.SphereGeometry(.24,16,12),skin);head.position.y=1.82;head.castShadow=true;head.name='head';hider.add(head);
+ for(let side of [-1,1]){let leg=new THREE.Mesh(new THREE.CapsuleGeometry(.13,.55,3,6),pants);leg.position.set(side*.17,.48,0);leg.castShadow=true;hider.add(leg);let arm=new THREE.Mesh(new THREE.CapsuleGeometry(.105,.5,3,6),shirt);arm.position.set(side*.42,1.2,0);arm.rotation.z=side*-.25;hider.add(arm)}
+ hider.position.set(0,0,10);scene.add(hider);
+ // Decorative trees
+ for(let i=0;i<10;i++){let x=-19+(i%5)*9,z=-18+Math.floor(i/5)*36;let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22,.3,1.7,8),mat(0x65452d));trunk.position.set(x,.85,z);scene.add(trunk);let crown=new THREE.Mesh(new THREE.ConeGeometry(1.5,3.2,8),mat(0x365b3c));crown.position.set(x,3,z);crown.castShadow=true;scene.add(crown)}
+ // Shooter rifle model in camera space, visible to shooter.
+ gun=new THREE.Group();let barrel=new THREE.Mesh(new THREE.CylinderGeometry(.045,.055,1.25,10),mat(0x222b2e));barrel.rotation.x=Math.PI/2;barrel.position.set(.38,-.3,-.85);gun.add(barrel);
+ let body=new THREE.Mesh(new THREE.BoxGeometry(.18,.22,.65),mat(0x3d493e));body.position.set(.38,-.43,-.45);gun.add(body);camera.add(gun);scene.add(camera);
+ clock=new THREE.Clock();window.addEventListener('resize',resize);renderer.domElement.addEventListener('pointerdown',aimDown);renderer.domElement.addEventListener('pointermove',aimMove);renderer.domElement.addEventListener('pointerup',aimUp);renderer.domElement.addEventListener('pointercancel',aimUp);
+ requestAnimationFrame(loop);
+}
+function resize(){if(!renderer)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}
+function resizeHider(){if(hider){hider.scale.y=crouching?.68:1;hider.position.y=0}}
+function setRole(r){role=r;health=100;remote.health=100;remaining=180;started=true;roundStart=performance.now();crouching=false;sprinting=false;inCover=false;updateHud();$('controls').classList.remove('hidden');$('lobby').classList.add('hidden');say(role==='hider'?'Hide! You have 3 minutes to survive.':'Find the hider. Swipe to aim; pinch to zoom.');toast(role==='hider'?'You are hiding!':'You are the sniper!');}
+function send(o){if(conn&&conn.open)conn.send(o)}
+function becomeShooter(){setRole('shooter')}
+function endRound(reason){if(!started)return;started=false;if(reason==='killed'){kills++;send({t:'score',kills,survivals});toast('Target eliminated! Roles swapping…')}else{survivals++;send({t:'score',kills,survivals});toast('Hider survived! Roles swapping…')}updateHud();say('Round over — swapping roles');setTimeout(()=>{let next=role==='hider'?'shooter':'hider';setRole(next);send({t:'swap',role:next,result:reason})},1800)}
+function createPeer(){
+ roomCode=Math.random().toString(36).slice(2,8).toUpperCase();
+ $('roomline').textContent=roomCode;$('hostbox').classList.remove('hidden');$('create').disabled=true;$('create').textContent='ROOM CREATED…';
+ peer=new Peer('hs-'+roomCode.toLowerCase());
+ peer.on('open',()=>say('Room ready. Share code '+roomCode));
+ peer.on('connection',c=>{if(conn){c.close();return}conn=c;setupConn(true)});
+ peer.on('error',e=>{say('Connection error: '+e.type+'. Try creating a new room.');$('create').disabled=false;$('create').textContent='CREATE PRIVATE ROOM';});
+}
+function joinPeer(){
+ roomCode=$('code').value.trim().toUpperCase();if(roomCode.length<4){toast('Enter the room code');return}
+ peer=new Peer();peer.on('open',()=>{conn=peer.connect('hs-'+roomCode.toLowerCase(),{reliable:true});setupConn(false)});peer.on('error',e=>{say('Could not connect: '+e.type+'. Check the code and try again.');});
+}
+function setupConn(isHost){
+ host=isHost;
+ conn.on('open',()=>{connected=true;say('Both players connected. Host starts the round.');$('waitmsg').textContent='Connected!';$('start').classList.remove('hidden');$('join').disabled=true;send({t:'hello',host:isHost});if(!isHost){$('lobby').classList.remove('hidden');$('panel').innerHTML='<h1>Connected! 🎮</h1><p>You are in the room. The host will start the round. Keep this page open.</p><p class="small">Turn your phone to landscape.</p>'; }});
+ conn.on('data',d=>onMessage(d));
+ conn.on('close',()=>{connected=false;say('Partner disconnected. Rejoin the room to continue.')});
+ conn.on('error',()=>say('Connection interrupted. Check internet on both phones.'));
+}
+function onMessage(d){
+ if(d.t==='hello'&&host){send({t:'ready'})}
+ if(d.t==='ready'&&host){$('waitmsg').textContent='Partner connected!';$('start').classList.remove('hidden')}
+ if(d.t==='start'){setRole(d.role)}
+ if(d.t==='state'){remote={...remote,...d.state};if(role==='shooter'){hider.position.set(remote.x,0,remote.z);hider.rotation.y=remote.yaw;resizeHider()}}
+ if(d.t==='shot'){health=Math.max(0,health-(d.damage||0));updateHud();toast(`${(d.part||'body').toUpperCase()} HIT −${d.damage||0} HP`);if(health<=0)endRound('killed');}
+ if(d.t==='swap'){if(d.result==='killed')kills++;setRole(d.role==='hider'?'shooter':'hider');updateHud()}
+ if(d.t==='score'){kills=d.kills??kills;survivals=d.survivals??survivals;updateHud()}
+ if(d.t==='notice')toast(d.text);
+}
+function startGame(){if(!connected){toast('Waiting for partner to connect');return}setRole('hider');send({t:'start',role:'shooter'});say('Round started! Hider: survive. Shooter: find them.');}
+$('create').addEventListener('click',createPeer);$('join').addEventListener('click',joinPeer);$('start').addEventListener('click',startGame);
+$('code').addEventListener('input',()=>{$('code').value=$('code').value.toUpperCase().replace(/[^A-Z0-9]/g,'')});
+$('crouch').addEventListener('click',()=>{if(role!=='hider')return;crouching=!crouching;resizeHider();send({t:'state',state:{x:hider.position.x,z:hider.position.z,yaw:hider.rotation.y,crouching,health}});$('crouch').textContent=crouching?'STAND':'CROUCH'});
+$('sprint').addEventListener('pointerdown',e=>{e.preventDefault();if(role==='hider')sprinting=true});['pointerup','pointercancel','pointerleave'].forEach(ev=>$('sprint').addEventListener(ev,()=>sprinting=false));
+$('cover').addEventListener('click',()=>{if(role!=='hider')return;let near=coverObjects.some(o=>{let p=o.position;return Math.hypot(p.x-hider.position.x,p.z-hider.position.z)<2.8});inCover=near;toast(near?'Taking cover':'Move closer to a wall, crate or car');});
+$('fire').addEventListener('click',fireShot);
+let stickActive=false,stickId=null,stickCenter={x:0,y:0};
+$('stick').addEventListener('pointerdown',e=>{if(role!=='hider')return;stickActive=true;stickId=e.pointerId;let r=$('stick').getBoundingClientRect();stickCenter={x:r.left+r.width/2,y:r.top+r.height/2};$('stick').setPointerCapture(e.pointerId);moveStick(e)});
+$('stick').addEventListener('pointermove',e=>{if(stickActive&&e.pointerId===stickId)moveStick(e)});
+function moveStick(e){let dx=e.clientX-stickCenter.x,dy=e.clientY-stickCenter.y,len=Math.hypot(dx,dy),max=37;if(len>max){dx=dx/len*max;dy=dy/len*max}stickVec={x:dx/max,y:dy/max};$('nub').style.transform=`translate(${dx}px,${dy}px)`}
+function resetStick(){stickActive=false;stickVec={x:0,y:0};$('nub').style.transform='translate(0,0)'}
+$('stick').addEventListener('pointerup',resetStick);$('stick').addEventListener('pointercancel',resetStick);
+function aimDown(e){if(role!=='shooter')return;if(e.pointerType==='touch'){if(lastTouch){pinchDist=Math.hypot(e.clientX-lastTouch.x,e.clientY-lastTouch.y);lastTouch={x:e.clientX,y:e.clientY,id:e.pointerId};return}lastTouch={x:e.clientX,y:e.clientY,id:e.pointerId};return}lastTouch={x:e.clientX,y:e.clientY,id:e.pointerId}}
+function aimMove(e){if(role!=='shooter'||!lastTouch)return;
+ if(e.pointerType==='touch'&&e.isPrimary===false&&lastTouch.id!==e.pointerId){let dist=Math.hypot(e.clientX-lastTouch.x,e.clientY-lastTouch.y);if(pinchDist){zoom=Math.max(.65,Math.min(3.2,zoom+(dist-pinchDist)*.008));camera.fov=70/zoom;camera.updateProjectionMatrix()}pinchDist=dist;lastTouch={x:e.clientX,y:e.clientY,id:e.pointerId};return}
+ if(e.pointerId===lastTouch.id){let dx=e.clientX-lastTouch.x,dy=e.clientY-lastTouch.y;yaw-=dx*.004;pitch=Math.max(-.65,Math.min(.55,pitch-dy*.003));lastTouch={x:e.clientX,y:e.clientY,id:e.pointerId}}
+}
+function aimUp(e){if(lastTouch&&e.pointerId===lastTouch.id)lastTouch=null;pinchDist=0}
+function fireShot(){
+ if(role!=='shooter'||!started)return;
+ // Camera centre ray; first object in the ray decides whether the hider is hit or cover blocks it.
+ const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(0,0),camera);
+ const targets=[hider,...coverObjects];const hits=ray.intersectObjects(targets,true);
+ if(!hits.length){toast('Miss!');return}
+ let obj=hits[0].object;
+ if(hider&&isDescendant(obj,hider)){
+   let part=obj.name==='head'?'head':(obj.position.y>1.5?'head':obj.position.y<.7?'leg':'body');
+   let base=part==='head'?100:part==='body'?45:20;
+   send({t:'shot',damage:base,part});toast(`${part.toUpperCase()} HIT`);
+ }else{
+   const o=coverObjects.find(c=>c===obj||isDescendant(obj,c));if(o){let type=o.userData.coverType||'concrete';toast(`${type.toUpperCase()} COVER — shot blocked`)}else toast('Miss!');
+ }
+}
+function isDescendant(o,parent){let n=o;while(n){if(n===parent)return true;n=n.parent}return false}
+function loop(){
+ requestAnimationFrame(loop);if(!renderer||!scene)return;let dt=Math.min(clock.getDelta(),.05);
+ if(started){
+  remaining=Math.max(0,remaining-dt);setTimer();
+  if(remaining<=0&&host)endRound('survived');
+  if(role==='hider'){
+   let speed=sprinting?7:3.2;if(crouching)speed*=.48;
+   let fwd=new THREE.Vector3(-Math.sin(hider.rotation.y),0,-Math.cos(hider.rotation.y));
+   let right=new THREE.Vector3(Math.cos(hider.rotation.y),0,-Math.sin(hider.rotation.y));
+   hider.position.addScaledVector(right,stickVec.x*speed*dt);hider.position.addScaledVector(fwd,-stickVec.y*speed*dt);
+   hider.position.x=THREE.MathUtils.clamp(hider.position.x,-20,20);hider.position.z=THREE.MathUtils.clamp(hider.position.z,-20,20);
+   if(Math.abs(stickVec.x)+Math.abs(stickVec.y)>.1)hider.rotation.y=Math.atan2(-stickVec.x,-stickVec.y);
+   resizeHider();
+   if(performance.now()-lastSend>60){send({t:'state',state:{x:hider.position.x,z:hider.position.z,yaw:hider.rotation.y,crouching,sprinting,health}});lastSend=performance.now()}
+  }else{
+   camera.position.set(0,1.65,19);camera.rotation.order='YXZ';camera.rotation.y=yaw;camera.rotation.x=pitch;
+  }
+ }
+ if(role==='hider'){camera.position.set(hider.position.x+Math.sin(hider.rotation.y)*5,2.7,hider.position.z+Math.cos(hider.rotation.y)*5);camera.lookAt(hider.position.x,1.15,hider.position.z)}
+ else if(!started){camera.position.set(0,7,28);camera.lookAt(0,0,0)}
+ renderer.render(scene,camera);
+}
+init3D();
+</script>
+</body></html>
